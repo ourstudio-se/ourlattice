@@ -134,7 +134,8 @@ class Polytope(Lattice):
 
         return df
             
-    def is_valid(self, x: pd.Series)-> bool:
+    def isin(self, point: dict)-> bool:
+        x = pd.Series(point, index=self.variables).fillna(0)
         return (self.A.dot(x) >= self.b).all()
     
     def to_constraints(self):
