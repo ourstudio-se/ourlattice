@@ -32,7 +32,28 @@ class Polytope(Lattice):
         """
 
         try:
-            polytope = pd.DataFrame(constraints).set_index([
+            _constraints = []
+            for i in range(len(constraints)):
+                constraint = constraints[i]
+                if not SupportFieldType.B.value in constraint:
+                    raise AttributeError(
+                        f"Key {SupportFieldType.B.value} is required in a constraint, got: {constraint}",
+                    )
+                
+                if not SupportFieldType.ID.value in constraint:
+                    constraint[SupportFieldType.ID.value] = i
+
+                if not SupportFieldType.R.value in constraint:
+                    constraint[SupportFieldType.R.value] = None
+
+                if not SupportFieldType.W.value in constraint:
+                    constraint[SupportFieldType.W.value] = None
+
+                _constraints.append(
+                    constraint,
+                )
+
+            polytope = pd.DataFrame(_constraints).set_index([
                 SupportFieldType.ID.value, 
                 SupportFieldType.R.value,
                 SupportFieldType.W.value,
@@ -92,14 +113,26 @@ class Polytope(Lattice):
         r = np.array([list(k) for k in self._obj.index.values])[:, self.support_value_index[support_field_type]]
         return pd.Series(r)
 
+    def strip(self, axis=None):
+        """
+            Removes rows/columns with only zero as constant. 
+        """
+        df = self._obj
+        n_reduce = {
+            None: [0, 1],
+            0: [0],
+            1: [1],
+        }.get(axis, None)
+        
+        if n_reduce is None:
+            raise Exception(f"Polytop cannot strip: axis {axis} does not exist.")
 
-    def strip(self):
-        """
-            Removes variables/columns with only zero as constant. 
-        """
-        A = self.A.loc[:, (self.A != 0).any(axis=0)]
-        A[SupportFieldType.B.value] = self.b
-        return A
+        for i in n_reduce:
+            msk = (self.A == 0).all(axis=abs(i-1))
+            if msk[msk].index.size > 0:
+                df = df.drop(msk[msk].index, axis=i)
+
+        return df
             
     def is_valid(self, x: pd.Series)-> bool:
         return (self.A.dot(x) >= self.b).all()
@@ -193,9 +226,9 @@ class Polytope(Lattice):
 
         return hashlib.sha256(bts_box).hexdigest()
 
-    def falses(self, point: pd.Series) -> pd.DataFrame:
+    def falses(self, point: dict) -> pd.DataFrame:
         """
-            Finding what facets that are NOT satisfied from given config.
+            Finding what facets that are NOT satisfied from given interpretation.
 
             Args:
                 point: pd.Series
@@ -203,14 +236,12 @@ class Polytope(Lattice):
             Return: 
                 Polytope / pd.DataFrame
         """
-        falses_df = self._obj[self.A.dot(point) < self.b]
-        falses_df = falses_df.polytope.strip()
+        point = pd.Series(point, index=self.variables).fillna(0)
+        return self._obj[self.A.values.dot(point) < self.b.values]
 
-        return falses_df
-
-    def trues(self, point: pd.Series) -> pd.DataFrame:
+    def trues(self, point: dict) -> pd.DataFrame:
         """
-            Finding what facets that are satisfied from given config.
+            Finding what facets that are satisfied from given interpretation.
 
             Args:
                 point: pd.Series
@@ -218,10 +249,8 @@ class Polytope(Lattice):
             Return: 
                 Polytope / pd.DataFrame
         """
-        trues_df = self._obj[self.A.dot(point) >= self.b]
-        trues_df = trues_df.polytope.strip()
-
-        return trues_df
+        point = pd.Series(point, index=self.variables).fillna(0)
+        return self._obj[self.A.values.dot(point) >= self.b.values]
 
     def tautologies(self) -> pd.DataFrame:
 
@@ -300,3 +329,37 @@ class Polytope(Lattice):
         _df.loc[:, SupportFieldType.B.value] = b -a
 
         return _df
+
+    def unbalanced(self) -> pd.DataFrame:
+
+        """
+            Returns a polytope of this polytopes *unbalanced* facets.
+            An unbalanced facet is an unsatisfied constraint when
+            no variable has been set.
+
+            E.g., the constraint {"a": 1, "b": 0, SupportVector: 2} is unbalanced.
+
+            Return:
+                Polytope / pd.DataFrame
+        """
+
+        A, b = self.A.values, self.b.values
+        msk = A.dot(np.zeros((self.variables.size))) < b
+        return self._obj[msk]
+
+    def balanced(self) -> pd.DataFrame:
+
+        """
+            Returns a polytope of this polytopes *balanced* facets.
+            A balanced facet is a constraint that is satisfied when
+            no variable has been set.
+
+            E.g., the constraint {"a": 1, "b": 0, SupportVector: 0} is balanced.
+
+            Return:
+                Polytope / pd.DataFrame
+        """
+
+        A, b = self.A.values, self.b.values
+        msk = A.dot(np.zeros((self.variables.size))) >= b
+        return self._obj[msk]

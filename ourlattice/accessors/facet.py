@@ -18,7 +18,7 @@ class Facet(Lattice):
             raise AttributeError(f"Must have {should_be_in_index} indexes in series.")
 
     @staticmethod
-    def construct(B, ID, R, W, **kwargs) -> pd.Series:
+    def construct(ID, B, R=None, W=None, **kwargs) -> pd.Series:
         d = {
             **{
                 SupportFieldType.B.value: B,

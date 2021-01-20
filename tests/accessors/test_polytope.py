@@ -4,6 +4,7 @@ import numpy as np
 from unittest import TestCase
 from ourlattice.accessors.lattice import SupportFieldType
 from ourlattice.accessors.polytope import Polytope
+from ourlattice.accessors.facet import Facet
 
 class TestPolytope(TestCase):
 
@@ -97,7 +98,7 @@ class TestPolytope(TestCase):
     def test_will_generate_errors_from_combination(self):
 
         df = self.helper_get_valid_df()
-        combination = pd.Series({"a": 1, "b": 1}, index=df.polytope.variables).fillna(0)
+        combination = {"a": 1, "b": 1}
         errors = df.polytope.falses(combination)
         self.assertGreater(errors.shape[0], 0)
 
@@ -400,3 +401,123 @@ class TestPolytope(TestCase):
         self.assertEqual(tauts_df.index[0], (0,"EXACTLY_ONE",0))
         self.assertEqual(tauts_df.shape[0], 1)
         self.assertTrue(contrs_df.empty)
+
+    def test_aggregate_weights(self):
+
+        df = Polytope.construct(
+            id=None,
+            constraints=[
+                {
+                    "a": 1, 
+                    "b": 1, 
+                    "c": 1, 
+                    SupportFieldType.B.value: 3, 
+                    SupportFieldType.W.value: -1,
+                },
+                {
+                    "a": 1, 
+                    SupportFieldType.B.value: 1, 
+                    SupportFieldType.W.value: 8,
+                },
+                {
+                    "b": 1, 
+                    SupportFieldType.B.value: 1, 
+                    SupportFieldType.W.value: 9,
+                },
+                {
+                    "c": 1, 
+                    SupportFieldType.B.value: 1, 
+                    SupportFieldType.W.value: 10,
+                },
+            ]
+        )
+
+        self.assertEqual(
+            df.polytope.trues({"a": 1}).polytope.w.sum(),
+            8,
+        )
+
+        self.assertEqual(
+            df.polytope.trues({"a": 1, "b": 1}).polytope.w.sum(),
+            8+9,
+        )
+
+        self.assertEqual(
+            df.polytope.trues({"a": 1, "b": 1, "c": 1}).polytope.w.sum(),
+            8+9+10-1,
+        )
+
+    def test_to_strip(self):
+        df = Polytope.construct(
+            id=None, 
+            constraints=[   
+                {
+                    "a": 1, 
+                    "b": 1, 
+                    "c": 0,
+                    SupportFieldType.B.value: 1, 
+                    SupportFieldType.ID.value: 0,
+                    SupportFieldType.R.value: "EXACTLY_ONE",
+                    SupportFieldType.W.value: 0,
+                },
+                {
+                    "a": -1, 
+                    "b": -1, 
+                    "c": 0,
+                    SupportFieldType.B.value: -1, 
+                    SupportFieldType.ID.value: 0,
+                    SupportFieldType.R.value: "EXACTLY_ONE",
+                    SupportFieldType.W.value: 0,
+                },
+                {
+                    "a": -1, 
+                    "b": 1, 
+                    "c": 0,
+                    SupportFieldType.B.value: 0, 
+                    SupportFieldType.ID.value: 1,
+                    SupportFieldType.R.value: "REQUIRES_ALL",
+                    SupportFieldType.W.value: 0,
+                },
+                {
+                    "a": 0, 
+                    "b": 0, 
+                    "c": 0,
+                    SupportFieldType.B.value: 0, 
+                    SupportFieldType.ID.value: 2,
+                    SupportFieldType.R.value: "EMPTY",
+                    SupportFieldType.W.value: 0,
+                },
+            ],
+        )
+
+        stripped_full_df = df.polytope.strip()
+        self.assertIn((0, "EXACTLY_ONE", 0), stripped_full_df.index)
+        self.assertIn((1, "REQUIRES_ALL", 0), stripped_full_df.index)
+        self.assertNotIn((2, "EMPTY", 0), stripped_full_df.index)
+        self.assertNotIn("c", stripped_full_df.columns)
+        
+        stripped_row_df = df.polytope.strip(axis=0)
+        self.assertIn((0, "EXACTLY_ONE", 0), stripped_row_df.index)
+        self.assertIn((1, "REQUIRES_ALL", 0), stripped_row_df.index)
+        self.assertNotIn((2, "EMPTY", 0), stripped_row_df.index)
+        self.assertIn("c", stripped_row_df.columns)
+
+        stripped_clm_df = df.polytope.strip(axis=1)
+        self.assertIn((0, "EXACTLY_ONE", 0), stripped_clm_df.index)
+        self.assertIn((1, "REQUIRES_ALL", 0), stripped_clm_df.index)
+        self.assertIn((2, "EMPTY", 0), stripped_clm_df.index)
+        self.assertNotIn("c", stripped_clm_df.columns)
+
+        # Test to strip nothing
+        df = self.helper_get_valid_df()
+        stripped = df.polytope.strip()
+        self.assertEqual(df.shape, stripped.shape)
+
+        # Test to strip with invalid axis
+        self.assertRaises(
+            Exception,
+            df.polytope.strip,
+            kwargs={
+                "axis": "invalid_axis",
+            }
+        )
