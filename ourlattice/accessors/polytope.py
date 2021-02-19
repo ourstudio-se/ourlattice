@@ -4,9 +4,8 @@ import numpy as np
 
 from ourlattice.accessors.lattice import Lattice, SupportFieldType
 from ourlattice.accessors.facet import Facet
-from ourlattice.utils.storages.storage import Storage
 
-from typing import Callable, List, Dict
+from typing import List, Dict
 
 @pd.api.extensions.register_dataframe_accessor("polytope")
 class Polytope(Lattice):
@@ -150,82 +149,6 @@ class Polytope(Lattice):
             } 
             for i, r in self._obj.iterrows()
         ]
-    
-    # def to_dimacscnf(self, handlers: Dict[str, Callable[[pd.Series], List[Expression]]]):
-
-    #     """
-    #         Converts into a DIMACS CNF.
-
-    #         Return: tuple(dict, DimacsCNF)
-    #     """
-
-    #     exprs_kv = {}
-    #     for (_id, rule, _), row in self._obj.iterrows():
-    #         if not _id in exprs_kv:
-    #             fn = handlers.get(rule, None)
-    #             if not fn:
-    #                 raise NotImplementedError(f"Missing handler for rule type '{rule}'")
-                
-    #             exprs_kv[_id] = fn(row)
-
-    #     exprs = list(exprs_kv.values())
-    #     result = expr2dimacscnf(
-    #         And(*exprs).tseitin(),
-    #     )
-
-    #     return result
-
-    # def number_of_solutions(self, sharp_sat_solver: Callable[[DimacsCNF], int], handlers: Dict[str, Callable[[pd.Series], List[Expression]]]):
-
-    #     """
-    #         Calculates the number of solutions n in this polytope.
-
-    #         Args:
-    #             sharp_sat_solver: (DimacsCNF) -> (int)
-    #         Return: int
-    #     """
-
-    #     _, cnf_file_format = self.to_dimacscnf(handlers=handlers)
-    #     n = sharp_sat_solver(cnf_file_format)
-    #     return n
-
-    async def save(self, _id: str, storage: Storage, compress="gzip"):
-        await storage.upload_data(
-            _id=_id,
-            obj=self._obj,
-            meta={
-                "id": _id,
-                "hash": self.generate_hash(),
-            },
-            compress=compress,
-        )
-
-    @staticmethod    
-    async def load(self, _id: str, storage: Storage, decompress="gzip"):
-        df = await storage.download_data(
-            _id=_id,
-            decompress=decompress,
-        )
-        return df
-
-    def generate_hash(self) -> str:
-        df = self._obj
-        ignore_column_names = [
-            SupportFieldType.R.value,
-            SupportFieldType.B.value,
-            SupportFieldType.ID.value,
-        ]
-        columns_sorted = sorted(list(df.columns))
-        variable_header_sorted = [name for name in columns_sorted if name not in ignore_column_names]
-        bts_columns = ''.join(variable_header_sorted).encode('utf-8')
-
-        values = df[columns_sorted].values.astype(np.int16)
-        indices_sorted = np.argsort([str(row) for row in values])
-        bts_values = values[indices_sorted].tobytes()
-
-        bts_box = b''.join((bts_columns, bts_values))
-
-        return hashlib.sha256(bts_box).hexdigest()
 
     def falses(self, point: dict) -> pd.DataFrame:
         """
@@ -266,6 +189,7 @@ class Polytope(Lattice):
         """
 
         A, b = self.A.values, self.b.values
+        A[A > 0] = 0
         A_column_sum = A.sum(axis=1)
 
         # Upper bound candidates

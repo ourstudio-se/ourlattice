@@ -87,14 +87,6 @@ class TestPolytope(TestCase):
         except Exception as e:
             self.fail(f"test_can_strip_polytope failed: {e}")
 
-    def test_can_hash_polytope(self):
-
-        df = self.helper_get_valid_df()
-        try:
-            _ = df.polytope.generate_hash()
-        except Exception as e:
-            self.fail(f"test_can_hash_polytope failed: {e}")
-    
     def test_will_generate_errors_from_combination(self):
 
         df = self.helper_get_valid_df()
@@ -194,6 +186,36 @@ class TestPolytope(TestCase):
         actual_index = set(tautologies_df.index)
         expected_index = set({(0,0,0), (1,0,0), (2,0,0), (3,0,0)})
         self.assertEqual(actual_index.difference(expected_index), set())
+
+    def test_will_not_find_this_constraint_as_tautology_constraint(self):
+
+        df = Polytope.construct(
+            id=None, 
+            constraints=[   
+                {
+                    "a": 1, 
+                    "b": 1, 
+                    "c": -1,
+                    SupportFieldType.B.value: 0, 
+                    SupportFieldType.ID.value: 0,
+                    SupportFieldType.R.value: 0,
+                    SupportFieldType.W.value: 0,
+                },
+                {
+                    "a": -1,
+                    "b": -1,
+                    "c": 1,
+                    "d": 1,
+                    SupportFieldType.B.value: -1,
+                    SupportFieldType.ID.value: 0,
+                    SupportFieldType.R.value: 0,
+                    SupportFieldType.W.value: 0,
+                },
+            ],
+        )
+
+        tautologies_df = df.polytope.tautologies()
+        self.assertTrue(tautologies_df.empty)
 
     def test_will_return_correct_contradictions(self):
 
