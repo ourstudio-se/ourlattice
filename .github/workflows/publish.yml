@@ -1,0 +1,83 @@
+name: Publish to PyPI
+
+# Publishes whenever the version in setup.cfg is one that isn't on PyPI yet.
+on:
+  push:
+    branches: [master]
+    paths: [setup.cfg]
+  workflow_dispatch:
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.pypi.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from setup.cfg
+        id: version
+        run: |
+          version=$(python3 -c "import configparser; c = configparser.ConfigParser(); c.read('setup.cfg'); print(c['metadata']['version'])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version in setup.cfg: $version"
+
+      - name: Check whether the version is already on PyPI
+        id: pypi
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/ourlattice/$VERSION/json")
+          case "$status" in
+            200) echo "publish=false" >> "$GITHUB_OUTPUT"; echo "ourlattice $VERSION is already on PyPI, skipping." ;;
+            404) echo "publish=true" >> "$GITHUB_OUTPUT"; echo "ourlattice $VERSION is new, publishing." ;;
+            *) echo "Unexpected response $status from PyPI"; exit 1 ;;
+          esac
+
+  test:
+    needs: check-version
+    if: needs.check-version.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - run: pytest tests
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: [check-version, build]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/ourlattice/${{ needs.check-version.outputs.version }}/
+    permissions:
+      # Required for PyPI Trusted Publishing
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
