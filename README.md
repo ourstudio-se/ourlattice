@@ -9,6 +9,10 @@ Use the package manager [pip](https://pip.pypa.io/en/stable/) to install
 pip install ourlattice
 ```
 
+Version 0.0.4 fixes `tautologies()` for read-only NumPy arrays, including those
+returned by pandas 3 Copy-on-Write, without modifying the source polytope.
+The minimum dependencies remain NumPy 1.19.5 and pandas 1.2.0.
+
 ## Usage
 The `ourlattice` Python package is a [Pandas](https://pandas.pydata.org/) extension that has lot of features for [polytopes](https://en.wikipedia.org/wiki/Polytope). Start by define your polytope.
 
