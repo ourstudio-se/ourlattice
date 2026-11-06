@@ -195,9 +195,30 @@ class TestPolytope(TestCase):
         df = Polytope.construct(
             id=None,
             constraints=[
-                {"a": 1, "b": 2, "#b": 1, "#id": 0, "#r": 0, "#w": 0},
-                {"a": 1, "b": -2, "#b": -1, "#id": 1, "#r": 0, "#w": 0},
-                {"a": -1, "b": 2, "#b": 2, "#id": 2, "#r": 0, "#w": 0},
+                {
+                    "a": 1,
+                    "b": 2,
+                    SupportFieldType.B.value: 1,
+                    SupportFieldType.ID.value: 0,
+                    SupportFieldType.R.value: 0,
+                    SupportFieldType.W.value: 0,
+                },
+                {
+                    "a": 1,
+                    "b": -2,
+                    SupportFieldType.B.value: -1,
+                    SupportFieldType.ID.value: 1,
+                    SupportFieldType.R.value: 0,
+                    SupportFieldType.W.value: 0,
+                },
+                {
+                    "a": -1,
+                    "b": 2,
+                    SupportFieldType.B.value: 2,
+                    SupportFieldType.ID.value: 2,
+                    SupportFieldType.R.value: 0,
+                    SupportFieldType.W.value: 0,
+                },
             ],
         )
         original_df = df.copy(deep=True)
