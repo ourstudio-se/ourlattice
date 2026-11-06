@@ -195,6 +195,8 @@ class TestPolytope(TestCase):
         df = Polytope.construct(
             id=None,
             constraints=[
+                # Tautology
+                # Always true when "a" has been assumed
                 {
                     "a": 1,
                     "b": 2,
@@ -211,6 +213,8 @@ class TestPolytope(TestCase):
                     SupportFieldType.R.value: 0,
                     SupportFieldType.W.value: 0,
                 },
+                # Not a tautology
+                # Never true when "a" has been assumed
                 {
                     "a": -1,
                     "b": 2,
