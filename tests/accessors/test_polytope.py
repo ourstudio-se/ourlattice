@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 
 from unittest import TestCase
+from unittest.mock import PropertyMock, patch
 from ourlattice.accessors.lattice import SupportFieldType
 from ourlattice.accessors.polytope import Polytope
 from ourlattice.accessors.facet import Facet
@@ -181,11 +182,39 @@ class TestPolytope(TestCase):
             ],
         )
 
+        original_df = df.copy(deep=True)
         tautologies_df = df.polytope.tautologies()
 
         actual_index = set(tautologies_df.index)
         expected_index = set({(0,0,0), (1,0,0), (2,0,0), (3,0,0)})
-        self.assertEqual(actual_index.difference(expected_index), set())
+        self.assertEqual(actual_index, expected_index)
+        pd.testing.assert_frame_equal(df, original_df)
+
+    def test_tautologies_after_assume_with_read_only_coefficients(self):
+
+        df = Polytope.construct(
+            id=None,
+            constraints=[
+                {"a": 1, "b": 2, "#b": 1, "#id": 0, "#r": 0, "#w": 0},
+                {"a": 1, "b": -2, "#b": -1, "#id": 1, "#r": 0, "#w": 0},
+                {"a": -1, "b": 2, "#b": 2, "#id": 2, "#r": 0, "#w": 0},
+            ],
+        )
+        original_df = df.copy(deep=True)
+        assumed_df = df.polytope.assume(["a"])
+        original_assumed_df = assumed_df.copy(deep=True)
+        coefficients = assumed_df.polytope.A.values.copy()
+        original_coefficients = coefficients.copy()
+        coefficients.setflags(write=False)
+
+        with patch.object(Polytope, "A", new_callable=PropertyMock) as matrix:
+            matrix.return_value.values = coefficients
+            tautologies_df = assumed_df.polytope.tautologies()
+
+        pd.testing.assert_frame_equal(tautologies_df, original_assumed_df.iloc[:2])
+        pd.testing.assert_frame_equal(assumed_df, original_assumed_df)
+        pd.testing.assert_frame_equal(df, original_df)
+        np.testing.assert_array_equal(coefficients, original_coefficients)
 
     def test_will_not_find_this_constraint_as_tautology_constraint(self):
 

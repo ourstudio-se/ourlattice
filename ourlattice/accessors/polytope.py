@@ -189,7 +189,7 @@ class Polytope(Lattice):
         """
 
         A, b = self.A.values, self.b.values
-        A[A > 0] = 0
+        A = np.minimum(A, 0)
         A_column_sum = A.sum(axis=1)
 
         # Upper bound candidates
